@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Add Product to {{ shop.name }}</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+    <div class="admin-form">
+        <h2>Add Product to {{ shop.name }}</h2>
+        <a href="{{ url_for('shop_detail', shop_id=shop.id) }}" class="back-btn">&larr; Back to Shop</a>
+        
+        <form method="POST">
+            <div class="form-group">
+                <label>Product Name:</label>
+                <input type="text" name="name" required>
+            </div>
+            <div class="form-group">
+                <label>Buy Price ($):</label>
+                <input type="number" step="0.01" name="buy_price" required>
+            </div>
+            <div class="form-group">
+                <label>Sell Price ($):</label>
+                <input type="number" step="0.01" name="sell_price" required>
+            </div>
+            <div class="form-group">
+                <label>Quantity in Stock:</label>
+                <input type="number" name="nr_in_stock" required>
+            </div>
+            <button type="submit">Add Product</button>
+        </form>
+    </div>
+</body>
+</html>

@@ -1,0 +1,337 @@
+Let's extend the application to include products for each shop with a many-to-one relationship. Here's the implementation:
+
+### Step 1: Update the Models (app.py)
+
+```python
+# ... existing imports ...
+
+class Shop(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(100), nullable=False)
+    description = db.Column(db.Text)
+    location = db.Column(db.String(200))
+    image = db.Column(db.String(100))
+    # Relationship to products
+    products = db.relationship('Product', backref='shop', lazy=True, cascade="all, delete-orphan")
+
+    def __repr__(self):
+        return f'<Shop {self.name}>'
+
+class Product(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(100), nullable=False)
+    sell_price = db.Column(db.Float, nullable=False)
+    buy_price = db.Column(db.Float, nullable=False)
+    nr_in_stock = db.Column(db.Integer, nullable=False)
+    shop_id = db.Column(db.Integer, db.ForeignKey('shop.id'), nullable=False)
+
+    def __repr__(self):
+        return f'<Product {self.name}>'
+```
+
+### Step 2: Create New Routes for Product Management
+
+```python
+# ... existing routes ...
+
+@app.route('/admin/shop/<int:shop_id>/add_product', methods=['GET', 'POST'])
+def add_product(shop_id):
+    if not session.get('logged_in'):
+        return redirect(url_for('login'))
+    
+    shop = Shop.query.get_or_404(shop_id)
+    
+    if request.method == 'POST':
+        new_product = Product(
+            name=request.form['name'],
+            sell_price=float(request.form['sell_price']),
+            buy_price=float(request.form['buy_price']),
+            nr_in_stock=int(request.form['nr_in_stock']),
+            shop_id=shop_id
+        )
+        db.session.add(new_product)
+        db.session.commit()
+        return redirect(url_for('shop_detail', shop_id=shop_id))
+    
+    return render_template('add_product.html', shop=shop)
+
+@app.route('/admin/product/edit/<int:product_id>', methods=['GET', 'POST'])
+def edit_product(product_id):
+    if not session.get('logged_in'):
+        return redirect(url_for('login'))
+    
+    product = Product.query.get_or_404(product_id)
+    shop = product.shop
+    
+    if request.method == 'POST':
+        product.name = request.form['name']
+        product.sell_price = float(request.form['sell_price'])
+        product.buy_price = float(request.form['buy_price'])
+        product.nr_in_stock = int(request.form['nr_in_stock'])
+        db.session.commit()
+        return redirect(url_for('shop_detail', shop_id=shop.id))
+    
+    return render_template('edit_product.html', product=product)
+
+@app.route('/admin/product/delete/<int:product_id>')
+def delete_product(product_id):
+    if not session.get('logged_in'):
+        return redirect(url_for('login'))
+    
+    product = Product.query.get_or_404(product_id)
+    shop_id = product.shop.id
+    db.session.delete(product)
+    db.session.commit()
+    return redirect(url_for('shop_detail', shop_id=shop_id))
+```
+
+### Step 3: Update Shop Detail Template (templates/shop_detail.html)
+
+```html
+<!-- ... existing header ... -->
+
+<div class="shop-content">
+    <h2>About This Shop</h2>
+    <p>{{ shop.description }}</p>
+    
+    <h2>Products</h2>
+    {% if shop.products %}
+        <table class="product-table">
+            <thead>
+                <tr>
+                    <th>Product</th>
+                    <th>Buy Price</th>
+                    <th>Sell Price</th>
+                    <th>In Stock</th>
+                    {% if session.logged_in %}
+                    <th>Actions</th>
+                    {% endif %}
+                </tr>
+            </thead>
+            <tbody>
+                {% for product in shop.products %}
+                <tr>
+                    <td>{{ product.name }}</td>
+                    <td>${{ product.buy_price }}</td>
+                    <td>${{ product.sell_price }}</td>
+                    <td>{{ product.nr_in_stock }}</td>
+                    {% if session.logged_in %}
+                    <td class="actions">
+                        <a href="{{ url_for('edit_product', product_id=product.id) }}">Edit</a>
+                        <a href="{{ url_for('delete_product', product_id=product.id) }}" 
+                           onclick="return confirm('Delete this product?')">Delete</a>
+                    </td>
+                    {% endif %}
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    {% else %}
+        <p>No products available for this shop.</p>
+    {% endif %}
+    
+    {% if session.logged_in %}
+    <div class="admin-actions">
+        <a href="{{ url_for('add_product', shop_id=shop.id) }}" class="add-product-btn">Add New Product</a>
+        <a href="{{ url_for('edit_shop', shop_id=shop.id) }}" class="edit-btn">Edit Shop</a>
+        <a href="{{ url_for('delete_shop', shop_id=shop.id) }}" class="delete-btn"
+           onclick="return confirm('Delete this shop and all its products?')">Delete Shop</a>
+    </div>
+    {% endif %}
+</div>
+
+<!-- ... existing footer ... -->
+```
+
+### Step 4: Create New Templates
+
+**templates/add_product.html:**
+```html
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Add Product to {{ shop.name }}</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+    <div class="admin-form">
+        <h2>Add Product to {{ shop.name }}</h2>
+        <a href="{{ url_for('shop_detail', shop_id=shop.id) }}" class="back-btn">&larr; Back to Shop</a>
+        
+        <form method="POST">
+            <div class="form-group">
+                <label>Product Name:</label>
+                <input type="text" name="name" required>
+            </div>
+            <div class="form-group">
+                <label>Buy Price ($):</label>
+                <input type="number" step="0.01" name="buy_price" required>
+            </div>
+            <div class="form-group">
+                <label>Sell Price ($):</label>
+                <input type="number" step="0.01" name="sell_price" required>
+            </div>
+            <div class="form-group">
+                <label>Quantity in Stock:</label>
+                <input type="number" name="nr_in_stock" required>
+            </div>
+            <button type="submit">Add Product</button>
+        </form>
+    </div>
+</body>
+</html>
+```
+
+**templates/edit_product.html:**
+```html
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Edit Product</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+    <div class="admin-form">
+        <h2>Edit Product: {{ product.name }}</h2>
+        <a href="{{ url_for('shop_detail', shop_id=product.shop.id) }}" class="back-btn">&larr; Back to Shop</a>
+        
+        <form method="POST">
+            <div class="form-group">
+                <label>Product Name:</label>
+                <input type="text" name="name" value="{{ product.name }}" required>
+            </div>
+            <div class="form-group">
+                <label>Buy Price ($):</label>
+                <input type="number" step="0.01" name="buy_price" value="{{ product.buy_price }}" required>
+            </div>
+            <div class="form-group">
+                <label>Sell Price ($):</label>
+                <input type="number" step="0.01" name="sell_price" value="{{ product.sell_price }}" required>
+            </div>
+            <div class="form-group">
+                <label>Quantity in Stock:</label>
+                <input type="number" name="nr_in_stock" value="{{ product.nr_in_stock }}" required>
+            </div>
+            <button type="submit">Update Product</button>
+        </form>
+    </div>
+</body>
+</html>
+```
+
+### Step 5: Update Database Creation
+
+Update create_db.py to include the new Product model:
+
+```python
+from app import app, db, Shop, Product  # Add Product import
+
+with app.app_context():
+    db.create_all()
+    print("Database created with Shop and Product tables!")
+```
+
+### Step 6: Add CSS for Products (static/style.css)
+
+Add these styles to your CSS file:
+
+```css
+/* Product table styles */
+.product-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 20px 0;
+}
+
+.product-table th, .product-table td {
+    border: 1px solid #ddd;
+    padding: 8px;
+    text-align: left;
+}
+
+.product-table th {
+    background-color: #f2f2f2;
+}
+
+.product-table tr:nth-child(even) {
+    background-color: #f9f9f9;
+}
+
+/* Admin actions */
+.admin-actions {
+    margin-top: 30px;
+    padding-top: 20px;
+    border-top: 1px solid #eee;
+}
+
+.add-product-btn {
+    background-color: #4CAF50;
+    color: white;
+    padding: 10px 15px;
+    text-decoration: none;
+    border-radius: 4px;
+    display: inline-block;
+    margin-right: 10px;
+}
+
+.add-product-btn:hover {
+    background-color: #45a049;
+}
+
+/* Form styling */
+.admin-form .form-group {
+    margin-bottom: 15px;
+}
+
+.admin-form label {
+    display: block;
+    margin-bottom: 5px;
+}
+
+.admin-form input[type="text"],
+.admin-form input[type="number"],
+.admin-form textarea {
+    width: 100%;
+    padding: 8px;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+}
+```
+
+### Step 7: Update Admin Shop Deletion
+
+When deleting a shop, we need to handle the cascade deletion of products:
+
+```python
+@app.route('/admin/delete/<int:shop_id>')
+def delete_shop(shop_id):
+    if not session.get('logged_in'):
+        return redirect(url_for('login'))
+    
+    shop = Shop.query.get_or_404(shop_id)
+    # Products will be deleted automatically due to cascade="all, delete-orphan"
+    db.session.delete(shop)
+    db.session.commit()
+    return redirect(url_for('admin'))
+```
+
+### Step 8: Run Database Migration
+
+Since we've added new models, we need to update the database:
+
+1. Delete the existing shops.db file (or use migrations)
+2. Run `python create_db.py` again
+
+Now the application supports:
+- Shops with multiple products
+- Product management (CRUD) for each shop
+- Automatic deletion of products when a shop is deleted
+- Product display on shop detail pages
+- Admin interface for managing products per shop
+
+The relationship is set up so:
+- Each shop has many products (`shop.products`)
+- Each product belongs to one shop (`product.shop`)
+- When a shop is deleted, all its products are automatically deleted
+
+This completes the multi-shop system with product management capabilities.

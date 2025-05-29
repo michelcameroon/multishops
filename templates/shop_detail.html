@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>{{ shop.name }} Details</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+    <div class="shop-detail">
+        <a href="{{ url_for('index') }}" class="back-btn">&larr; Back to All Shops</a>
+        <div class="shop-header">
+            <img src="{{ shop.image }}" alt="{{ shop.name }}">
+            <div class="shop-info">
+                <h1>{{ shop.name }}</h1>
+                <p class="location">{{ shop.location }}</p>
+            </div>
+        </div>
+
+<!--        
+        <div class="shop-content">
+            <h2>About This Shop</h2>
+            <p>{{ shop.description }}</p>
+        </div>
+-->
+
+<!-- ... existing header ... -->
+
+<div class="shop-content">
+    <h2>About This Shop</h2>
+    <p>{{ shop.description }}</p>
+    
+    <h2>Products</h2>
+    {% if shop.products %}
+        <table class="product-table">
+            <thead>
+                <tr>
+                    <th>Product</th>
+                    <th>Buy Price</th>
+                    <th>Sell Price</th>
+                    <th>In Stock</th>
+                    {% if session.logged_in %}
+                    <th>Actions</th>
+                    {% endif %}
+                </tr>
+            </thead>
+            <tbody>
+                {% for product in shop.products %}
+                <tr>
+                    <td>{{ product.name }}</td>
+                    <td>${{ product.buy_price }}</td>
+                    <td>${{ product.sell_price }}</td>
+                    <td>{{ product.nr_in_stock }}</td>
+                    {% if session.logged_in %}
+                    <td class="actions">
+                        <a href="{{ url_for('edit_product', product_id=product.id) }}">Edit</a>
+                        <a href="{{ url_for('delete_product', product_id=product.id) }}" 
+                           onclick="return confirm('Delete this product?')">Delete</a>
+                    </td>
+                    {% endif %}
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    {% else %}
+        <p>No products available for this shop.</p>
+    {% endif %}
+    
+    {% if session.logged_in %}
+    <div class="admin-actions">
+        <a href="{{ url_for('add_product', shop_id=shop.id) }}" class="add-product-btn">Add New Product</a>
+        <a href="{{ url_for('edit_shop', shop_id=shop.id) }}" class="edit-btn">Edit Shop</a>
+        <a href="{{ url_for('delete_shop', shop_id=shop.id) }}" class="delete-btn"
+           onclick="return confirm('Delete this shop and all its products?')">Delete Shop</a>
+    </div>
+    {% endif %}
+</div>
+
+<!-- ... existing footer ... -->
+
+        
+        {% if session.logged_in %}
+        <div class="admin-actions">
+            <a href="{{ url_for('edit_shop', shop_id=shop.id) }}" class="edit-btn">Edit</a>
+            <a href="{{ url_for('delete_shop', shop_id=shop.id) }}" class="delete-btn"
+               onclick="return confirm('Are you sure you want to delete this shop?')">Delete</a>
+        </div>
+        {% endif %}
+    </div>
+</body>
+</html>
